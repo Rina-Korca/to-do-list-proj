@@ -6,7 +6,7 @@ const Todo = (title, description, dueDate, priority) => {
     description,
     dueDate,
     priority,
-    completed: false, // Add completed status if needed
+    completed: false, // Completed status
   };
 };
 
@@ -69,6 +69,7 @@ const renderTask = (todo) => {
       todo.completed ? "checked" : ""
     } class="complete-checkbox" data-id="${todo.id}">
     <h3>${todo.title}</h3>
+    <p>Description: ${todo.description}</p>
     <p>Due: ${todo.dueDate} | Priority: ${todo.priority}</p>
     <div class="todo-actions">
       <button class="edit-btn" data-id="${todo.id}">Edit</button>
@@ -104,14 +105,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const todoToEdit = defaultProject.todos.find(
         (todo) => todo.id === editId
       );
-      todoToEdit.title = title;
-      todoToEdit.description = description;
-      todoToEdit.dueDate = dueDate;
-      todoToEdit.priority = priority;
+      if (todoToEdit) {
+        todoToEdit.title = title;
+        todoToEdit.description = description; // Ensure description is updated
+        todoToEdit.dueDate = dueDate;
+        todoToEdit.priority = priority;
 
-      form.removeAttribute("data-edit-id");
-      submitBtn.textContent = "Add Todo";
-      formTitle.textContent = "Add a To-Do";
+        form.removeAttribute("data-edit-id");
+        submitBtn.textContent = "Add Todo";
+        formTitle.textContent = "Add a To-Do";
+      }
     } else {
       // Add new todo
       const newTodo = Todo(title, description, dueDate, priority);
@@ -123,24 +126,29 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Handling edit and delete actions
+  // Handling edit and delete actions
   document.addEventListener("click", (e) => {
     if (e.target.classList.contains("edit-btn")) {
       const id = e.target.dataset.id;
       const todoToEdit = defaultProject.todos.find((todo) => todo.id === id);
-      document.getElementById("todo-title").value = todoToEdit.title;
-      document.getElementById("todo-description").value =
-        todoToEdit.description;
-      document.getElementById("todo-due-date").value = todoToEdit.dueDate;
-      document.getElementById("todo-priority").value = todoToEdit.priority;
-      form.setAttribute("data-edit-id", id);
-      submitBtn.textContent = "Update Todo";
-      formTitle.textContent = "Update a To-Do";
+      if (todoToEdit) {
+        document.getElementById("todo-title").value = todoToEdit.title;
+        document.getElementById("todo-description").value =
+          todoToEdit.description;
+        document.getElementById("todo-due-date").value = todoToEdit.dueDate;
+        document.getElementById("todo-priority").value = todoToEdit.priority;
+        form.setAttribute("data-edit-id", id);
+        submitBtn.textContent = "Update Todo";
+        formTitle.textContent = "Update a To-Do";
+      }
     }
 
     if (e.target.classList.contains("delete-btn")) {
       const id = e.target.dataset.id;
-      defaultProject.removeTodo(id);
-      renderProject(defaultProject);
+      console.log("Delete button clicked for ID:", id); // Check which ID is being deleted
+      defaultProject.removeTodo(id); // Remove the todo from the project
+      console.log("Remaining todos after deletion:", defaultProject.todos); // Check remaining todos
+      renderProject(defaultProject); // Re-render the project to reflect changes
     }
   });
 
@@ -151,8 +159,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const todoToComplete = defaultProject.todos.find(
         (todo) => todo.id === id
       );
-      todoToComplete.completed = e.target.checked;
-      renderProject(defaultProject);
+      if (todoToComplete) {
+        todoToComplete.completed = e.target.checked; // Update the completed status
+        renderProject(defaultProject); // Re-render the project
+      }
     }
   });
 
