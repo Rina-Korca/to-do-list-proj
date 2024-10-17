@@ -1,31 +1,22 @@
-// Example Todo function
 const Todo = (title, description, dueDate, priority) => {
   return {
-    id: Date.now().toString(), // Unique ID generation
     title,
     description,
     dueDate,
     priority,
-    completed: false, // Completed status
+    completed: false,
   };
 };
 
-// Example Project function
 const Project = (name) => {
-  let todos = JSON.parse(localStorage.getItem("todos")) || [];
+  let todos = [];
 
   const addTodo = (todo) => {
     todos.push(todo);
-    saveTodos();
   };
 
   const removeTodo = (id) => {
     todos = todos.filter((todo) => todo.id !== id);
-    saveTodos();
-  };
-
-  const saveTodos = () => {
-    localStorage.setItem("todos", JSON.stringify(todos));
   };
 
   return { name, todos, addTodo, removeTodo };
@@ -33,26 +24,67 @@ const Project = (name) => {
 
 const defaultProject = Project("My Todos");
 
-// Load Todos from local storage
-const loadTodos = () => {
-  const storedTodos = JSON.parse(localStorage.getItem("todos")) || [];
-  storedTodos.forEach((todoData) => {
-    const newTodo = Todo(
-      todoData.title,
-      todoData.description,
-      todoData.dueDate,
-      todoData.priority
-    );
-    newTodo.id = todoData.id; // Restore the ID from storage
-    defaultProject.addTodo(newTodo);
-  });
-  renderProject(defaultProject);
+const loadTodos = async () => {
+  try {
+    const response = await fetch("http://localhost:5000/todos");
+    const todos = await response.json();
+    defaultProject.todos = todos;
+    renderProject(defaultProject);
+  } catch (error) {
+    console.error("Error loading todos:", error);
+  }
 };
 
-// Render all todos in the project
+const addTodoToBackend = async (newTodo) => {
+  try {
+    const response = await fetch("http://localhost:5000/todos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(newTodo),
+    });
+    const addedTodo = await response.json();
+    console.log("Todo added:", addedTodo);
+    await loadTodos();
+  } catch (error) {
+    console.error("Error adding todo:", error);
+  }
+};
+
+const updateTodoInBackend = async (id, updatedTodo) => {
+  try {
+    const response = await fetch(`http://localhost:5000/todos/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(updatedTodo),
+    });
+    const updated = await response.json();
+    console.log("Todo updated:", updated);
+    await loadTodos();
+  } catch (error) {
+    console.error("Error updating todo:", error);
+  }
+};
+
+const deleteTodoFromBackend = async (id) => {
+  try {
+    await fetch(`http://localhost:5000/todos/${id}`, {
+      method: "DELETE",
+    });
+    console.log("Todo deleted:", id);
+    await loadTodos();
+  } catch (error) {
+    console.error("Error deleting todo:", error);
+  }
+};
+
 const renderProject = (project) => {
+  console.log("Rendering project with todos:", project.todos);
   const app = document.getElementById("app");
-  app.innerHTML = ""; // Clear previous todos
+  app.innerHTML = "";
 
   project.todos.forEach((todo) => {
     const todoElement = renderTask(todo);
@@ -60,7 +92,6 @@ const renderProject = (project) => {
   });
 };
 
-// Function to create and return todo element
 const renderTask = (todo) => {
   const todoElement = document.createElement("div");
   todoElement.classList.add("todo-item");
@@ -79,16 +110,14 @@ const renderTask = (todo) => {
   return todoElement;
 };
 
-// Add event listeners and other functions
 document.addEventListener("DOMContentLoaded", () => {
-  loadTodos(); // Load todos when the application initializes
+  loadTodos();
 
-  // Form submission for adding/updating todos
   const form = document.getElementById("todo-form");
   const submitBtn = document.getElementById("submit-btn");
   const formTitle = document.getElementById("form-title");
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const title = document.getElementById("todo-title").value.trim();
@@ -101,33 +130,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const editId = form.getAttribute("data-edit-id");
 
     if (editId) {
-      // Update existing todo
       const todoToEdit = defaultProject.todos.find(
         (todo) => todo.id === editId
       );
       if (todoToEdit) {
-        todoToEdit.title = title;
-        todoToEdit.description = description; // Ensure description is updated
-        todoToEdit.dueDate = dueDate;
-        todoToEdit.priority = priority;
-
+        const updatedTodo = {
+          ...todoToEdit,
+          title,
+          description,
+          dueDate,
+          priority,
+        };
+        await updateTodoInBackend(editId, updatedTodo);
         form.removeAttribute("data-edit-id");
         submitBtn.textContent = "Add Todo";
         formTitle.textContent = "Add a To-Do";
       }
     } else {
-      // Add new todo
       const newTodo = Todo(title, description, dueDate, priority);
-      defaultProject.addTodo(newTodo);
+      await addTodoToBackend(newTodo);
     }
 
     form.reset();
-    renderProject(defaultProject);
   });
 
-  // Handling edit and delete actions
-  // Handling edit and delete actions
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     if (e.target.classList.contains("edit-btn")) {
       const id = e.target.dataset.id;
       const todoToEdit = defaultProject.todos.find((todo) => todo.id === id);
@@ -145,28 +172,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (e.target.classList.contains("delete-btn")) {
       const id = e.target.dataset.id;
-      console.log("Delete button clicked for ID:", id); // Check which ID is being deleted
-      defaultProject.removeTodo(id); // Remove the todo from the project
-      console.log("Remaining todos after deletion:", defaultProject.todos); // Check remaining todos
-      renderProject(defaultProject); // Re-render the project to reflect changes
+      await deleteTodoFromBackend(id);
     }
   });
 
-  // Checkbox functionality to mark todos as complete/incomplete
-  document.addEventListener("change", (e) => {
+  document.addEventListener("change", async (e) => {
     if (e.target.classList.contains("complete-checkbox")) {
       const id = e.target.dataset.id;
       const todoToComplete = defaultProject.todos.find(
         (todo) => todo.id === id
       );
       if (todoToComplete) {
-        todoToComplete.completed = e.target.checked; // Update the completed status
-        renderProject(defaultProject); // Re-render the project
+        todoToComplete.completed = e.target.checked;
+        await updateTodoInBackend(id, todoToComplete);
       }
     }
   });
 
-  // Filtering todos based on the selected filter
   document
     .getElementById("filter-tasks")
     .addEventListener("change", (event) => {
@@ -174,8 +196,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const filteredTodos = defaultProject.todos.filter((todo) => {
         if (filter === "completed") return todo.completed;
         if (filter === "incomplete") return !todo.completed;
-        return true; // Show all
+        return true;
       });
-      renderProject({ ...defaultProject, todos: filteredTodos }); // Render filtered todos
+      renderProject({ ...defaultProject, todos: filteredTodos });
     });
 });
